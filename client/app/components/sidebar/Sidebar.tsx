@@ -2,6 +2,7 @@ import { ExternalLink, History, Home, Info } from "lucide-react";
 import SidebarSearch from "./SidebarSearch";
 import SidebarItem from "./SidebarItem";
 import SidebarSettings from "./SidebarSettings";
+import SidebarUsers from "./SidebarUsers";
 
 export default function Sidebar() {
   const iconSize = 18;
@@ -53,6 +54,7 @@ export default function Sidebar() {
         >
           <History size={iconSize} />
         </SidebarItem>
+        <SidebarUsers size={iconSize} />
       </div>
       <div className="flex gap-4 sm:flex-col">
         <SidebarItem

@@ -65,9 +65,10 @@ type UpdateApiKeyLabelOpts struct {
 }
 
 type SaveUserOpts struct {
-	Username string
-	Password string
-	Role     models.UserRole
+	Username   string
+	Password   string
+	Role       models.UserRole
+	Visibility models.Visibility
 }
 
 type SaveApiKeyOpts struct {
@@ -108,9 +109,10 @@ type UpdateAlbumOpts struct {
 }
 
 type UpdateUserOpts struct {
-	ID       int32
-	Username string
-	Password string
+	ID         int32
+	Username   string
+	Password   string
+	Visibility models.Visibility
 }
 
 type AddArtistsToAlbumOpts struct {

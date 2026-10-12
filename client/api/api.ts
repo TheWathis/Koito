@@ -288,7 +288,48 @@ async function getRewindStats(args: timeframe): Promise<RewindStats> {
   return handleJson<RewindStats>(r);
 }
 
+function getUsers(): Promise<User[]> {
+  return fetch(`/apis/web/v1/users`).then((r) => handleJson<User[]>(r));
+}
+
+function getFamily(): Promise<FamilyMember[]> {
+  return fetch(`/apis/web/v1/family`).then((r) =>
+    handleJson<FamilyMember[]>(r),
+  );
+}
+
+async function createUser(
+  username: string,
+  password: string,
+  role: "user" | "admin",
+  visibility: Visibility,
+): Promise<CreatedUser> {
+  const r = await fetch(`/apis/web/v1/users`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password, role, visibility }),
+  });
+  return handleJson<CreatedUser>(r);
+}
+
+function deleteUser(id: number): Promise<Response> {
+  return fetch(`/apis/web/v1/users/${id}`, { method: "DELETE" });
+}
+
+function setVisibility(visibility: Visibility): Promise<Response> {
+  return fetch(`/apis/web/v1/user`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ visibility }),
+  });
+}
+
 export {
+  getUsers,
+  getFamily,
+  createUser,
+  deleteUser,
+  setVisibility,
   getTopAlbums,
   search,
   replaceImage,
@@ -420,10 +461,24 @@ type SearchResponse = {
   artists: Artist[];
   tracks: Track[];
 };
+type Visibility = "public" | "members" | "private";
 type User = {
   id: number;
   username: string;
   role: "user" | "admin";
+  visibility: Visibility;
+};
+type FamilyMember = {
+  user: User;
+  listens_all_time: number;
+  listens_week: number;
+  minutes_week: number;
+  top_artist_week?: Artist;
+  now_playing?: Track;
+};
+type CreatedUser = {
+  user: User;
+  api_key: ApiKey;
 };
 type ApiKey = {
   id: number;
@@ -459,6 +514,9 @@ type RewindStats = {
 };
 
 export type {
+  Visibility,
+  FamilyMember,
+  CreatedUser,
   getItemsArgs,
   getActivityArgs,
   getInterestArgs,

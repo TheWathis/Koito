@@ -61,6 +61,17 @@ func Authenticate(store db.UserStore, mode AuthMode) func(http.Handler) http.Han
 						user, err = validateAPIKey(ctx, store, r)
 					}
 				} else {
+					// The instance is readable without logging in, but a visitor
+					// who is logged in must still be recognised so that their own
+					// profile and the visibility rules can be applied.
+					if u, _ := validateSession(ctx, store, r); u != nil {
+						user = u
+					} else if u, _ := validateAPIKey(ctx, store, r); u != nil {
+						user = u
+					}
+					if user != nil {
+						r = r.WithContext(context.WithValue(ctx, UserContextKey, user))
+					}
 					next.ServeHTTP(w, r)
 					return
 				}

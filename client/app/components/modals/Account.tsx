@@ -3,6 +3,7 @@ import { useState } from "react";
 import { AsyncButton } from "../AsyncButton";
 import { useAppContext } from "~/providers/AppProvider";
 import SubHeader from "../primitives/SubHeader";
+import VisibilitySetting from "./VisibilitySetting";
 
 export default function Account() {
   const [username, setUsername] = useState("");
@@ -66,6 +67,7 @@ export default function Account() {
             Logout
           </AsyncButton>
         </div>
+        <VisibilitySetting />
         <SubHeader>Update User</SubHeader>
         <form
           action="#"

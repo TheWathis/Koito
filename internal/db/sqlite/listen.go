@@ -35,10 +35,12 @@ func (s *Sqlite) DeleteListen(ctx context.Context, trackId int32, listenedAt tim
 	if trackId == 0 {
 		return errors.New("DeleteListen: required parameter 'trackId' missing")
 	}
-	_, err := s.db.ExecContext(ctx,
-		`DELETE FROM listens WHERE track_id = ? AND listened_at = ?`,
-		trackId, listenedAt.Unix(),
-	)
+	query := `DELETE FROM listens WHERE track_id = ? AND listened_at = ?`
+	// A user-scoped context can only delete the scoped users' own listens.
+	if ids, ok := db.UserScope(ctx); ok {
+		query += " AND " + userCondition(ids)
+	}
+	_, err := s.db.ExecContext(ctx, query, trackId, listenedAt.Unix())
 	return err
 }
 

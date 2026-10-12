@@ -42,6 +42,9 @@ func bindRoutes(
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(db, middleware.AuthModeLoginGate))
+			// Every read below only sees the listens of the user(s) selected with
+			// ?user=<name|all>, after the visibility rules have been applied.
+			r.Use(middleware.ScopeUser(db))
 			r.Get("/artist/{id}", handlers.GetArtistHandler(db))                  // done
 			r.Get("/artist/{id}/aliases", handlers.GetArtistAliasesHandler(db))   // done
 			r.Get("/artist/{id}/interest", handlers.GetArtistInterestHandler(db)) // done
@@ -67,6 +70,8 @@ func bindRoutes(
 			r.Get("/stats", handlers.StatsHandler(db))
 			r.Get("/search", handlers.SearchHandler(db))
 			r.Get("/summary", handlers.SummaryHandler(db))
+			r.Get("/users", handlers.ListUsersHandler(db))
+			r.Get("/family", handlers.FamilyHandler(db))
 		})
 		r.Post("/logout", handlers.LogoutHandler(db))
 		if !cfg.RateLimitDisabled() {
@@ -92,27 +97,27 @@ func bindRoutes(
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.Authenticate(db, middleware.AuthModeSessionOrAPIKey))
 
-			r.Delete("/artist/{id}", handlers.DeleteArtistHandler(db))
+			r.With(middleware.RequireAdmin).Delete("/artist/{id}", handlers.DeleteArtistHandler(db))
 			r.Delete("/artist/{id}/aliases", handlers.DeleteArtistAliasHandler(db))
-			r.Post("/artist/{id}/merge", handlers.MergeArtistsHandler(db))
+			r.With(middleware.RequireAdmin).Post("/artist/{id}/merge", handlers.MergeArtistsHandler(db))
 			r.Post("/artist/{id}/aliases", handlers.CreateArtistAliasHandler(db))
 			r.Patch("/artist/{id}", handlers.UpdateArtistHandler(db))
 			r.Patch("/artist/{id}/image", handlers.ReplaceArtistImageHandler(db))
 			r.Patch("/artist/{id}/aliases/primary", handlers.SetPrimaryArtistAliasHandler(db))
 
-			r.Delete("/album/{id}", handlers.DeleteAlbumHandler(db))
+			r.With(middleware.RequireAdmin).Delete("/album/{id}", handlers.DeleteAlbumHandler(db))
 			r.Delete("/album/{id}/aliases", handlers.DeleteAlbumAliasHandler(db))
-			r.Post("/album/{id}/merge", handlers.MergeAlbumsHandler(db))
+			r.With(middleware.RequireAdmin).Post("/album/{id}/merge", handlers.MergeAlbumsHandler(db))
 			r.Post("/album/{id}/aliases", handlers.CreateAlbumAliasHandler(db))
 			r.Patch("/album/{id}", handlers.UpdateAlbumHandler(db))
 			r.Patch("/album/{id}/image", handlers.ReplaceAlbumImageHandler(db))
 			r.Patch("/album/{id}/aliases/primary", handlers.SetPrimaryAlbumAliasHandler(db))
 			r.Patch("/album/{id}/artists/{artist_id}", handlers.SetPrimaryAlbumArtistHandler(db))
 
-			r.Delete("/track/{id}", handlers.DeleteTrackHandler(db))
+			r.With(middleware.RequireAdmin).Delete("/track/{id}", handlers.DeleteTrackHandler(db))
 			r.Delete("/track/{id}/aliases", handlers.DeleteTrackAliasHandler(db))
 			r.Delete("/track/{id}/artists/{artist_id}", handlers.DeleteTrackArtistHandler(db))
-			r.Post("/track/{id}/merge", handlers.MergeTracksHandler(db))
+			r.With(middleware.RequireAdmin).Post("/track/{id}/merge", handlers.MergeTracksHandler(db))
 			r.Post("/track/{id}/aliases", handlers.CreateTrackAliasHandler(db))
 			r.Post("/track/{id}/artists", handlers.AddTrackArtistsHandler(db))
 			r.Patch("/track/{id}", handlers.UpdateTrackHandler(db))
@@ -120,7 +125,7 @@ func bindRoutes(
 			r.Patch("/track/{id}/artists/{artist_id}", handlers.SetPrimaryTrackArtistHandler(db))
 
 			r.Post("/listens", handlers.SubmitListenWithIDHandler(db))
-			r.Delete("/listens", handlers.DeleteListenHandler(db))
+			r.With(middleware.ScopeSelf).Delete("/listens", handlers.DeleteListenHandler(db))
 
 			r.Get("/user/apikeys", handlers.GetApiKeysHandler(db))
 			r.Post("/user/apikeys", handlers.GenerateApiKeyHandler(db))
@@ -129,9 +134,11 @@ func bindRoutes(
 
 			r.Get("/user", handlers.MeHandler())
 			r.Patch("/user", handlers.UpdateUserHandler(db))
+			r.With(middleware.RequireAdmin).Post("/users", handlers.CreateUserHandler(db))
+			r.With(middleware.RequireAdmin).Delete("/users/{id}", handlers.DeleteUserHandler(db))
 
 			r.Get("/export", handlers.ExportHandler(db))
-			r.Delete("/data", handlers.PurgeAllDataHandler(db))
+			r.With(middleware.RequireAdmin).Delete("/data", handlers.PurgeAllDataHandler(db))
 		})
 	})
 

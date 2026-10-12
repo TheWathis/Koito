@@ -38,6 +38,7 @@ export default defineConfig({
             { label: "Installation", slug: "guides/installation" },
             { label: "Importing Data", slug: "guides/importing" },
             { label: "Setting up the Scrobbler", slug: "guides/scrobbler" },
+            { label: "Multiple Users", slug: "guides/multi-user" },
             { label: "Editing Data", slug: "guides/editing" },
           ],
         },

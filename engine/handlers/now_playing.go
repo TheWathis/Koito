@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gabehf/koito/internal/db"
 	"github.com/gabehf/koito/internal/logger"
@@ -22,8 +23,14 @@ func NowPlayingHandler(store db.TrackStore) http.HandlerFunc {
 
 		l.Debug().Msg("NowPlayingHandler: Got request")
 
-		// Hardcoded user id as 1. Not great but it works until (if) multi-user is supported.
-		if trackIdI, ok := memkv.Store.Get("1"); !ok {
+		// Now playing is tracked per user, so it is only shown when the request is
+		// scoped to exactly one user (not for the combined "all" view).
+		ids, _ := db.UserScope(ctx)
+		if len(ids) != 1 {
+			utils.WriteJSON(w, http.StatusOK, NowPlayingResponse{CurrentlyPlaying: false})
+			return
+		}
+		if trackIdI, ok := memkv.Store.Get(strconv.Itoa(int(ids[0]))); !ok {
 			utils.WriteJSON(w, http.StatusOK, NowPlayingResponse{CurrentlyPlaying: false})
 		} else if trackId, ok := trackIdI.(int32); !ok {
 			l.Debug().Msg("NowPlayingHandler: Failed type assertion for trackIdI")

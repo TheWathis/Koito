@@ -48,18 +48,19 @@ func (s *Sqlite) DeleteSession(ctx context.Context, sessionId uuid.UUID) error {
 
 func (s *Sqlite) GetUserBySession(ctx context.Context, sessionId uuid.UUID) (*models.User, error) {
 	var u models.User
-	var role string
+	var role, vis string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.role, u.password
+		SELECT u.id, u.username, u.role, u.visibility, u.password
 		FROM users u JOIN sessions se ON u.id = se.user_id
 		WHERE se.id = ? AND se.expires_at > ?
 		LIMIT 1`,
-		sessionId.String(), time.Now().Unix()).Scan(&u.ID, &u.Username, &role, &u.Password)
+		sessionId.String(), time.Now().Unix()).Scan(&u.ID, &u.Username, &role, &vis, &u.Password)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("GetUserBySession: %w", err)
 	}
 	u.Role = models.UserRole(role)
+	u.Visibility = models.Visibility(vis)
 	return &u, nil
 }

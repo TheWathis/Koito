@@ -49,47 +49,50 @@ func validateAndNormalizePassword(password string) (string, error) {
 
 func (s *Sqlite) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	var u models.User
-	var role string
+	var role, vis string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, role, password FROM users WHERE username = ?`,
-		strings.ToLower(username)).Scan(&u.ID, &u.Username, &role, &u.Password)
+		`SELECT id, username, role, visibility, password FROM users WHERE username = ?`,
+		strings.ToLower(username)).Scan(&u.ID, &u.Username, &role, &vis, &u.Password)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("GetUserByUsername: %w", err)
 	}
 	u.Role = models.UserRole(role)
+	u.Visibility = models.Visibility(vis)
 	return &u, nil
 }
 
 func (s *Sqlite) GetAdminUser(ctx context.Context) (*models.User, error) {
 	var u models.User
-	var role string
+	var role, vis string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, username, role, password FROM users WHERE role = 'admin' LIMIT 1`,
-	).Scan(&u.ID, &u.Username, &role, &u.Password)
+		`SELECT id, username, role, visibility, password FROM users WHERE role = 'admin' ORDER BY id LIMIT 1`,
+	).Scan(&u.ID, &u.Username, &role, &vis, &u.Password)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("GetAdminUser: %w", err)
 	}
 	u.Role = models.UserRole(role)
+	u.Visibility = models.Visibility(vis)
 	return &u, nil
 }
 
 func (s *Sqlite) GetUserByApiKey(ctx context.Context, key string) (*models.User, error) {
 	var u models.User
-	var role string
+	var role, vis string
 	err := s.db.QueryRowContext(ctx, `
-		SELECT u.id, u.username, u.role, u.password
+		SELECT u.id, u.username, u.role, u.visibility, u.password
 		FROM users u JOIN api_keys ak ON u.id = ak.user_id
-		WHERE ak.key = ? LIMIT 1`, key).Scan(&u.ID, &u.Username, &role, &u.Password)
+		WHERE ak.key = ? LIMIT 1`, key).Scan(&u.ID, &u.Username, &role, &vis, &u.Password)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("GetUserByApiKey: %w", err)
 	}
 	u.Role = models.UserRole(role)
+	u.Visibility = models.Visibility(vis)
 	return &u, nil
 }
 
@@ -104,22 +107,29 @@ func (s *Sqlite) SaveUser(ctx context.Context, opts db.SaveUserOpts) (*models.Us
 	if opts.Role == "" {
 		opts.Role = models.UserRoleUser
 	}
+	if opts.Visibility == "" {
+		opts.Visibility = models.VisibilityPublic
+	}
+	if !opts.Visibility.Valid() {
+		return nil, fmt.Errorf("SaveUser: invalid visibility %q", opts.Visibility)
+	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, fmt.Errorf("SaveUser: bcrypt: %w", err)
 	}
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO users (username, role, password) VALUES (?,?,?)`,
-		strings.ToLower(opts.Username), string(opts.Role), hash,
+		`INSERT INTO users (username, role, visibility, password) VALUES (?,?,?,?)`,
+		strings.ToLower(opts.Username), string(opts.Role), string(opts.Visibility), hash,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("SaveUser: insert: %w", err)
 	}
 	id64, _ := res.LastInsertId()
 	return &models.User{
-		ID:       int32(id64),
-		Username: strings.ToLower(opts.Username),
-		Role:     opts.Role,
+		ID:         int32(id64),
+		Username:   strings.ToLower(opts.Username),
+		Role:       opts.Role,
+		Visibility: opts.Visibility,
 	}, nil
 }
 
@@ -155,6 +165,16 @@ func (s *Sqlite) UpdateUser(ctx context.Context, opts db.UpdateUserOpts) error {
 		if _, err := tx.ExecContext(ctx,
 			`UPDATE users SET password = ? WHERE id = ?`, hash, opts.ID); err != nil {
 			return fmt.Errorf("UpdateUser: password: %w", err)
+		}
+	}
+	if opts.Visibility != "" {
+		if !opts.Visibility.Valid() {
+			return fmt.Errorf("UpdateUser: invalid visibility %q", opts.Visibility)
+		}
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE users SET visibility = ? WHERE id = ?`,
+			string(opts.Visibility), opts.ID); err != nil {
+			return fmt.Errorf("UpdateUser: visibility: %w", err)
 		}
 	}
 	return tx.Commit()
@@ -206,8 +226,10 @@ func (s *Sqlite) UpdateApiKeyLabel(ctx context.Context, opts db.UpdateApiKeyLabe
 	return err
 }
 
-func (s *Sqlite) DeleteApiKey(ctx context.Context, id int32) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM api_keys WHERE id = ?`, id)
+// DeleteApiKey removes an API key, but only if it belongs to userID, so one
+// user can never delete another user's keys.
+func (s *Sqlite) DeleteApiKey(ctx context.Context, id int32, userID int32) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM api_keys WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
 
@@ -215,4 +237,53 @@ func (s *Sqlite) CountUsers(ctx context.Context) (int64, error) {
 	var count int64
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM users`).Scan(&count)
 	return count, err
+}
+
+func (s *Sqlite) GetUserByID(ctx context.Context, id int32) (*models.User, error) {
+	var u models.User
+	var role, vis string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, username, role, visibility, password FROM users WHERE id = ?`,
+		id).Scan(&u.ID, &u.Username, &role, &vis, &u.Password)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("GetUserByID: %w", err)
+	}
+	u.Role = models.UserRole(role)
+	u.Visibility = models.Visibility(vis)
+	return &u, nil
+}
+
+// ListUsers returns every user, ordered by id. Callers are responsible for
+// filtering the result by visibility.
+func (s *Sqlite) ListUsers(ctx context.Context) ([]*models.User, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, username, role, visibility FROM users ORDER BY id`)
+	if err != nil {
+		return nil, fmt.Errorf("ListUsers: %w", err)
+	}
+	defer rows.Close()
+	var users []*models.User
+	for rows.Next() {
+		var u models.User
+		var role, vis string
+		if err := rows.Scan(&u.ID, &u.Username, &role, &vis); err != nil {
+			return nil, fmt.Errorf("ListUsers: %w", err)
+		}
+		u.Role = models.UserRole(role)
+		u.Visibility = models.Visibility(vis)
+		users = append(users, &u)
+	}
+	return users, rows.Err()
+}
+
+// DeleteUser removes a user; their listens, sessions and API keys are removed
+// by ON DELETE CASCADE.
+func (s *Sqlite) DeleteUser(ctx context.Context, id int32) error {
+	if id == 0 {
+		return errors.New("DeleteUser: user id is required")
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	return err
 }

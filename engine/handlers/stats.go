@@ -41,7 +41,10 @@ func StatsHandler(store statsStore) http.HandlerFunc {
 
 		l.Debug().Msg("StatsHandler: Fetching statistics")
 
-		cacheKeyString := fmt.Sprintf("stats_%s_%s", r.URL.Query().Encode(), tf.Timezone.String())
+		// The scope is part of the key: without it, one user's cached stats would be
+		// served to anyone asking for the default view.
+		scopeIDs, _ := db.UserScope(r.Context())
+		cacheKeyString := fmt.Sprintf("stats_%s_%s_%v", r.URL.Query().Encode(), tf.Timezone.String(), scopeIDs)
 
 		if cachedStatsI, ok := memkv.Store.Get(cacheKeyString); ok {
 			if cachedStats, ok := cachedStatsI.(*StatsResponse); ok {
@@ -111,9 +114,9 @@ func StatsHandler(store statsStore) http.HandlerFunc {
 			ArtistCount:     artists,
 			MinutesListened: timeListenedS / 60,
 			DaysActive:      activeDays,
-			AvgDailyPlays:   float32(listens) / float32(activeDays),
-			TracksPerArtist: float32(tracks) / float32(artists),
-			AlbumsPerArtist: float32(albums) / float32(artists),
+			AvgDailyPlays:   safeRatio(float32(listens), float32(activeDays)),
+			TracksPerArtist: safeRatio(float32(tracks), float32(artists)),
+			AlbumsPerArtist: safeRatio(float32(albums), float32(artists)),
 			LongestStreak:   longestStreak,
 		}
 
@@ -122,4 +125,14 @@ func StatsHandler(store statsStore) http.HandlerFunc {
 		// save to cache for 30 minutes
 		memkv.Store.Set(cacheKeyString, resp, 30*time.Minute)
 	}
+}
+
+// safeRatio divides a by b, returning 0 when b is 0. A user who has not
+// listened to anything yet has no active days and no artists, and NaN cannot
+// be encoded as JSON.
+func safeRatio(a, b float32) float32 {
+	if b == 0 {
+		return 0
+	}
+	return a / b
 }

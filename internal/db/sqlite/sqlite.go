@@ -20,7 +20,7 @@ import (
 const defaultItemsPerPage = 20
 
 type Sqlite struct {
-	db *sql.DB
+	db *scopedDB
 }
 
 func New() (*Sqlite, error) {
@@ -42,7 +42,7 @@ func New() (*Sqlite, error) {
 		return nil, fmt.Errorf("sqlite.New: goose: %w", err)
 	}
 
-	return &Sqlite{db: db}, nil
+	return &Sqlite{db: &scopedDB{DB: db}}, nil
 }
 
 // NewInMemory opens an isolated in-memory SQLite database and runs migrations.
@@ -73,7 +73,7 @@ func NewInMemory() (*Sqlite, error) {
 		return nil, fmt.Errorf("sqlite.NewInMemory: goose: %w", err)
 	}
 
-	return &Sqlite{db: sqldb}, nil
+	return &Sqlite{db: &scopedDB{DB: sqldb}}, nil
 }
 
 // Not part of the DB interface this package implements. Only used for testing.

@@ -7,6 +7,7 @@ import (
 	"github.com/gabehf/koito/engine/middleware"
 	"github.com/gabehf/koito/internal/db"
 	"github.com/gabehf/koito/internal/logger"
+	"github.com/gabehf/koito/internal/models"
 	"github.com/gabehf/koito/internal/utils"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -138,8 +139,9 @@ func UpdateUserHandler(store db.UserStore) http.HandlerFunc {
 		}
 
 		body, err := utils.DecodeBody[struct {
-			Username *string `json:"username"`
-			Password *string `json:"password"`
+			Username   *string `json:"username"`
+			Password   *string `json:"password"`
+			Visibility *string `json:"visibility"`
 		}](r)
 		if err != nil {
 			l.Debug().Msg("UpdateUserHandler: Invalid request body")
@@ -147,7 +149,7 @@ func UpdateUserHandler(store db.UserStore) http.HandlerFunc {
 			return
 		}
 
-		if body.Username == nil && body.Password == nil {
+		if body.Username == nil && body.Password == nil && body.Visibility == nil {
 			l.Debug().Msg("UpdateUserHandler: No update parameters provided")
 			utils.WriteError(w, "no changes specified", http.StatusBadRequest)
 			return
@@ -159,6 +161,14 @@ func UpdateUserHandler(store db.UserStore) http.HandlerFunc {
 		}
 		if body.Password != nil {
 			opts.Password = *body.Password
+		}
+		if body.Visibility != nil {
+			v := models.Visibility(*body.Visibility)
+			if !v.Valid() {
+				utils.WriteError(w, "visibility must be 'public', 'members' or 'private'", http.StatusBadRequest)
+				return
+			}
+			opts.Visibility = v
 		}
 
 		if err := store.UpdateUser(ctx, opts); err != nil {
