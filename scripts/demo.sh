@@ -20,9 +20,18 @@ for arg in "$@"; do
   esac
 done
 
+yarn_cmd() {
+  if command -v corepack >/dev/null 2>&1; then
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 corepack yarn "$@"
+  else
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 npx --yes corepack yarn "$@"
+  fi
+}
+
 if [ "$FAST" = 0 ] || [ ! -f client/build/client/index.html ]; then
   echo "==> Building the web client"
-  (cd client && corepack yarn run build)
+  if [ ! -d client/node_modules ]; then (cd client && yarn_cmd install); fi
+  (cd client && yarn_cmd run build)
 fi
 
 echo "==> Building the server"
