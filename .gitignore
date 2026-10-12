@@ -1,2 +1,6 @@
 test_config_dir
 .env
+
+# local demo started by scripts/demo.sh
+.koito-demo/
+/koito
