@@ -1,6 +1,10 @@
 // Whose listening data the web UI shows. null means "my own" (or, for an
 // anonymous visitor, the instance's main profile); "all" means everyone the
 // viewer is allowed to see; anything else is a username.
+//
+// The choice is remembered per logged-in account, so when someone else logs in
+// on the same browser (or the session expires), they start on their own stats
+// instead of inheriting the previous person's choice.
 const STORAGE_KEY = "koito_viewed_user";
 const API_PREFIX = "/apis/web/v1";
 
@@ -16,9 +20,25 @@ const UNSCOPED = [
   "logout",
 ].map((p) => `${API_PREFIX}/${p}`);
 
+// Username of the logged-in account ("" for an anonymous visitor). Set by the
+// app once it knows who is logged in.
+let currentOwner = "";
+
+export function setViewer(username: string | null | undefined): void {
+  currentOwner = username ?? "";
+}
+
+type Stored = { owner: string; viewed: string };
+
 export function getViewedUser(): string | null {
   try {
-    return window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const stored = JSON.parse(raw) as Stored;
+    if (stored.owner !== currentOwner) return null;
+    // Viewing yourself is the default view.
+    if (stored.viewed === currentOwner) return null;
+    return stored.viewed || null;
   } catch {
     return null;
   }
@@ -26,8 +46,9 @@ export function getViewedUser(): string | null {
 
 export function setViewedUser(name: string | null): void {
   try {
-    if (name) {
-      window.localStorage.setItem(STORAGE_KEY, name);
+    if (name && name !== currentOwner) {
+      const stored: Stored = { owner: currentOwner, viewed: name };
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     } else {
       window.localStorage.removeItem(STORAGE_KEY);
     }
@@ -54,7 +75,9 @@ export function installUserScopedFetch(): void {
     ) {
       const viewed = getViewedUser();
       const [path, query = ""] = input.split("?");
-      const unscoped = UNSCOPED.some((p) => path === p || path.startsWith(`${p}/`));
+      const unscoped = UNSCOPED.some(
+        (p) => path === p || path.startsWith(`${p}/`),
+      );
       if (viewed && !unscoped) {
         const params = new URLSearchParams(query);
         if (!params.has("user")) params.set("user", viewed);

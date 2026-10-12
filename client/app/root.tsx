@@ -14,6 +14,7 @@ import "./app.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import Sidebar from "./components/sidebar/Sidebar";
+import ProfileBar from "./components/ProfileBar";
 import Footer from "./components/Footer";
 import { AppProvider } from "./providers/AppProvider";
 import { initTimezoneCookie } from "./tz";
@@ -92,6 +93,7 @@ export default function App() {
             <div className="flex-col flex sm:flex-row">
               <Sidebar />
               <div className="flex flex-col items-center mx-auto w-full ml-0 sm:ml-[58px]">
+                <ProfileBar />
                 <Outlet />
                 <Footer />
               </div>

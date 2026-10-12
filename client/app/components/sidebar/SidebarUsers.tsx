@@ -1,32 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { getUsers } from "api/api";
 import { Users } from "lucide-react";
-import { useEffect, useState } from "react";
-import UserSwitcherModal from "../modals/UserSwitcherModal";
 import SidebarItem from "./SidebarItem";
-import { getViewedUser, setViewedUser } from "~/utils/viewedUser";
 
 interface Props {
   size: number;
 }
 
+// Link to the family overview. Switching profiles is done from the bar at the
+// top of each page, which always says whose stats are shown.
 export default function SidebarUsers({ size }: Props) {
-  const [open, setOpen] = useState(false);
   const { data } = useQuery({ queryKey: ["users"], queryFn: getUsers });
 
-  // If the profile that was being viewed was deleted, or its owner made it
-  // private, every read would fail: fall back to the default view.
-  useEffect(() => {
-    const viewed = getViewedUser();
-    if (data && viewed && viewed !== "all") {
-      if (!data.some((u) => u.username === viewed)) {
-        setViewedUser(null);
-        window.location.reload();
-      }
-    }
-  }, [data]);
-
-  // A single-user instance has nothing to switch to.
+  // A single-user instance has no family page to show.
   if (!data || data.length < 2) {
     return null;
   }
@@ -34,9 +20,10 @@ export default function SidebarUsers({ size }: Props) {
   return (
     <SidebarItem
       space={10}
-      name="Switch user"
-      onClick={() => setOpen(true)}
-      modal={<UserSwitcherModal open={open} setOpen={setOpen} />}
+      to="/family"
+      name="Family"
+      onClick={() => {}}
+      modal={<></>}
     >
       <Users size={size} />
     </SidebarItem>
