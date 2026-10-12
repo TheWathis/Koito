@@ -5,7 +5,7 @@ import { timeSince } from "~/utils/utils";
 import ArtistLinks from "~/components/ArtistLinks";
 import { useState } from "react";
 import { useAppContext } from "~/providers/AppProvider";
-import ListensTable from "~/components/ListensTable";
+import ListensTable, { listenKey } from "~/components/ListensTable";
 
 export async function clientLoader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -37,7 +37,7 @@ export default function Listens() {
       const res = await deleteListen(listen);
       if (res.ok || (res.status >= 200 && res.status < 300)) {
         setItems((prev) =>
-          (prev ?? initialData.items).filter((i) => i.time !== listen.time),
+          (prev ?? initialData.items).filter((i) => listenKey(i) !== listenKey(listen)),
         );
       } else {
         console.error("Failed to delete listen:", res.status);

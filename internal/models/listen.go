@@ -8,4 +8,6 @@ import (
 type Listen struct {
 	Time  time.Time   `json:"time"`
 	Track SimpleTrack `json:"track"`
+	// User is the username of whoever listened.
+	User string `json:"user,omitempty"`
 }

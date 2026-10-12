@@ -1,7 +1,7 @@
 import { getCfg, type User } from "api/api";
 import { createContext, useContext, useEffect, useState } from "react";
 import pkg from "../../package.json";
-import { setViewer } from "~/utils/viewedUser";
+import { setViewer, subscribeViewedUser } from "~/utils/viewedUser";
 import semver from "semver";
 
 function isNewerVersion(current: string, latest: string): boolean {
@@ -52,6 +52,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [updateAvailable, setUpdateAvailable] = useState<boolean>(false);
   const [firstActivity, setFirstActivity] = useState<Date | undefined>();
 
+  // Depends on whose stats are shown.
+  const loadFirstActivity = () => {
+    fetch("/apis/web/v1/first-activity")
+      .then((r) => r.json())
+      .then((data) => {
+        setFirstActivity(data.error ? undefined : new Date(data.time));
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => subscribeViewedUser(loadFirstActivity), []);
+
   useEffect(() => {
     // Who is logged in decides whose stats are shown by default, so the
     // per-user reads below only start once it is known.
@@ -66,16 +78,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         setViewer(null);
         setUser(null);
       })
-      .finally(() => {
-        fetch("/apis/web/v1/first-activity")
-          .then((r) => r.json())
-          .then((data) => {
-            if (!data.error) {
-              setFirstActivity(new Date(data.time));
-            }
-          })
-          .catch(() => {});
-      });
+      .finally(loadFirstActivity);
 
     setConfigurableHomeActivity(true);
     setHomeItems(12);

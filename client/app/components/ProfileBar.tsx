@@ -4,7 +4,8 @@ import { ChevronDown, Check, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { useAppContext } from "~/providers/AppProvider";
-import { getViewedUser, setViewedUser } from "~/utils/viewedUser";
+import { useViewedUser } from "~/utils/viewedUser";
+import { useSwitchProfile } from "~/hooks/useSwitchProfile";
 
 function Avatar({ name, other }: { name: string; other?: boolean }) {
   return (
@@ -21,13 +22,6 @@ function Avatar({ name, other }: { name: string; other?: boolean }) {
   );
 }
 
-// Every read of the app is scoped to the viewed profile, so the simplest way to
-// switch everywhere at once is to remember the choice and reload.
-function choose(name: string | null) {
-  setViewedUser(name);
-  window.location.reload();
-}
-
 /**
  * Says, on every page, whose listening stats are on screen. Hidden on
  * single-user instances, where there is never any doubt.
@@ -37,7 +31,12 @@ export default function ProfileBar() {
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: getUsers });
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const viewed = getViewedUser();
+  const viewed = useViewedUser();
+  const switchProfile = useSwitchProfile();
+  const choose = (name: string | null) => {
+    setOpen(false);
+    switchProfile(name);
+  };
   const location = useLocation();
 
   // The viewed profile was deleted or made private: go back to the default.

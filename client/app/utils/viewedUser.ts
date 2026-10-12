@@ -5,6 +5,8 @@
 // The choice is remembered per logged-in account, so when someone else logs in
 // on the same browser (or the session expires), they start on their own stats
 // instead of inheriting the previous person's choice.
+import { useSyncExternalStore } from "react";
+
 const STORAGE_KEY = "koito_viewed_user";
 const API_PREFIX = "/apis/web/v1";
 
@@ -24,8 +26,15 @@ const UNSCOPED = [
 // app once it knows who is logged in.
 let currentOwner = "";
 
+// The viewed profile is stored per account, so it can only be read once the
+// logged-in account is known. Route loaders run before the app has rendered,
+// so installUserScopedFetch asks the server itself instead of waiting for it.
+let viewerKnown!: () => void;
+const viewerReady = new Promise<void>((resolve) => (viewerKnown = resolve));
+
 export function setViewer(username: string | null | undefined): void {
   currentOwner = username ?? "";
+  viewerKnown();
 }
 
 type Stored = { owner: string; viewed: string };
@@ -55,6 +64,19 @@ export function setViewedUser(name: string | null): void {
   } catch {
     // storage can be unavailable (private window); the default view still works
   }
+  listeners.forEach((l) => l());
+}
+
+const listeners = new Set<() => void>();
+
+export function subscribeViewedUser(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+// getViewedUser, re-rendering the component when the viewed profile changes.
+export function useViewedUser(): string | null {
+  return useSyncExternalStore(subscribeViewedUser, getViewedUser, () => null);
 }
 
 let installed = false;
@@ -73,17 +95,25 @@ export function installUserScopedFetch(): void {
       input.startsWith(`${API_PREFIX}/`) &&
       method === "GET"
     ) {
-      const viewed = getViewedUser();
       const [path, query = ""] = input.split("?");
       const unscoped = UNSCOPED.some(
         (p) => path === p || path.startsWith(`${p}/`),
       );
-      if (viewed && !unscoped) {
-        const params = new URLSearchParams(query);
-        if (!params.has("user")) params.set("user", viewed);
-        input = `${path}?${params.toString()}`;
+      if (!unscoped) {
+        return viewerReady.then(() => {
+          const viewed = getViewedUser();
+          const params = new URLSearchParams(query);
+          if (viewed && !params.has("user")) params.set("user", viewed);
+          const qs = params.toString();
+          return original(qs ? `${path}?${qs}` : path, init);
+        });
       }
     }
     return original(input, init);
   };
+
+  original(`${API_PREFIX}/user`)
+    .then((res) => res.json())
+    .then((data) => setViewer(data.error ? null : data.username))
+    .catch(() => setViewer(null));
 }

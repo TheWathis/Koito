@@ -9,7 +9,7 @@ import {
 } from "api/api";
 import { Link } from "react-router";
 import CardHeader from "./primitives/CardHeader";
-import ListensTable from "./ListensTable";
+import ListensTable, { listenKey } from "./ListensTable";
 
 interface Props {
   limit: number;
@@ -62,7 +62,7 @@ export default function LastPlays(props: Props) {
       const res = await deleteListen(listen);
       if (res.ok || (res.status >= 200 && res.status < 300)) {
         setItems((prev) =>
-          (prev ?? data.items).filter((i) => i.time !== listen.time),
+          (prev ?? data.items).filter((i) => listenKey(i) !== listenKey(listen)),
         );
       } else {
         console.error("Failed to delete listen:", res.status);

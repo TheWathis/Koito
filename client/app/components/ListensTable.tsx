@@ -5,6 +5,10 @@ import { type Listen, type NowPlaying } from "api/api";
 import { Link } from "react-router";
 import { timeSince } from "~/utils/utils";
 import { useAppContext } from "~/providers/AppProvider";
+import { useViewedUser } from "~/utils/viewedUser";
+
+// Identifies a listen; two people can play the same track in the same second.
+export const listenKey = (l: Listen) => `${l.user}_${l.track.id}_${l.time}`;
 
 interface ListensTableProps {
   listens: Listen[];
@@ -22,6 +26,8 @@ export default function ListensTable({
   onDelete,
 }: ListensTableProps) {
   const { user } = useAppContext();
+  // Several people's listens are mixed together: say whose each one is.
+  const showListener = useViewedUser() === "all";
   const imgColSizeClasses = "py-3 min-w-8 sm:min-w-11";
   const imgSize = 32;
   const timeColClasses = "text-(--color-fg-tertiary) pr-2 sm:pr-4 sm:text-sm";
@@ -67,7 +73,7 @@ export default function ListensTable({
         )}
         {listens.map((item) => (
           <tr
-            key={`last_listen_${item.time}`}
+            key={listenKey(item)}
             className="group border-b border-(--color-bg-tertiary) relative last:border-b-0"
           >
             <td className={imgColSizeClasses}>
@@ -95,6 +101,11 @@ export default function ListensTable({
                 </Link>
               </div>
             </td>
+            {showListener && (
+              <td className="px-2 whitespace-nowrap text-end text-(--color-fg-secondary) sm:text-sm">
+                {item.user}
+              </td>
+            )}
             <td
               className={`text-end whitespace-nowrap ${timeColClasses}`}
               title={new Date(item.time).toString()}
@@ -106,7 +117,8 @@ export default function ListensTable({
                 onClick={() => onDelete(item)}
                 className="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity text-(--color-fg-tertiary) hover:text-(--color-error)"
                 aria-label="Delete"
-                hidden={!user}
+                // Only your own listens can be deleted.
+                hidden={!user || item.user !== user.username}
               >
                 ×
               </button>

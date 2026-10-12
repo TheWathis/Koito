@@ -415,6 +415,8 @@ type Alias = {
 type Listen = {
   time: string;
   track: SimpleTrack;
+  // Username of whoever listened.
+  user?: string;
 };
 type PaginatedResponse<T> = {
   items: T[];

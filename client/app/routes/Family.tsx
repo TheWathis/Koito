@@ -1,18 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { getFamily, type FamilyMember } from "api/api";
 import SubHeader from "~/components/primitives/SubHeader";
-import { setViewedUser } from "~/utils/viewedUser";
+import { useSwitchProfile } from "~/hooks/useSwitchProfile";
 
 export function meta() {
   return [{ title: "Family - Koito" }];
 }
 
-function openProfile(name: string) {
-  setViewedUser(name);
-  window.location.assign("/");
-}
-
 function Member({ m }: { m: FamilyMember }) {
+  const switchProfile = useSwitchProfile();
   return (
     <div className="bg p-4 rounded-md flex flex-col gap-2 min-w-64">
       <div className="flex items-baseline justify-between gap-4">
@@ -43,7 +39,7 @@ function Member({ m }: { m: FamilyMember }) {
         )}
       </dl>
       <button
-        onClick={() => openProfile(m.user.username)}
+        onClick={() => switchProfile(m.user.username, "/")}
         className="large-button mt-2 self-start"
       >
         View listens

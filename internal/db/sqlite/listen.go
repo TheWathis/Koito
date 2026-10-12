@@ -52,6 +52,7 @@ type listenRow struct {
 	listenedAt int64
 	trackID    int32
 	title      string
+	username   string
 }
 
 func (s *Sqlite) GetListensPaginated(ctx context.Context, opts db.GetItemsOpts) (*db.PaginatedResponse[*models.Listen], error) {
@@ -92,27 +93,30 @@ func (s *Sqlite) GetListensPaginated(ctx context.Context, opts db.GetItemsOpts) 
 	switch {
 	case opts.TrackID > 0:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT l.listened_at, l.track_id, t.title
+			SELECT l.listened_at, l.track_id, t.title, u.username
 			FROM listens l
 			JOIN tracks_with_title t ON l.track_id = t.id
+			JOIN users u ON l.user_id = u.id
 			WHERE l.listened_at BETWEEN ? AND ? AND t.id = ?
 			ORDER BY l.listened_at DESC LIMIT ? OFFSET ?`,
 			t1.Unix(), t2.Unix(), opts.TrackID, opts.Limit, offset,
 		)
 	case opts.AlbumID > 0:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT l.listened_at, l.track_id, t.title
+			SELECT l.listened_at, l.track_id, t.title, u.username
 			FROM listens l
 			JOIN tracks_with_title t ON l.track_id = t.id
+			JOIN users u ON l.user_id = u.id
 			WHERE l.listened_at BETWEEN ? AND ? AND t.release_id = ?
 			ORDER BY l.listened_at DESC LIMIT ? OFFSET ?`,
 			t1.Unix(), t2.Unix(), opts.AlbumID, opts.Limit, offset,
 		)
 	case opts.ArtistID > 0:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT l.listened_at, l.track_id, t.title
+			SELECT l.listened_at, l.track_id, t.title, u.username
 			FROM listens l
 			JOIN tracks_with_title t ON l.track_id = t.id
+			JOIN users u ON l.user_id = u.id
 			JOIN artist_tracks at2 ON t.id = at2.track_id
 			WHERE l.listened_at BETWEEN ? AND ? AND at2.artist_id = ?
 			ORDER BY l.listened_at DESC LIMIT ? OFFSET ?`,
@@ -120,9 +124,10 @@ func (s *Sqlite) GetListensPaginated(ctx context.Context, opts db.GetItemsOpts) 
 		)
 	default:
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT l.listened_at, l.track_id, t.title
+			SELECT l.listened_at, l.track_id, t.title, u.username
 			FROM listens l
 			JOIN tracks_with_title t ON l.track_id = t.id
+			JOIN users u ON l.user_id = u.id
 			WHERE l.listened_at BETWEEN ? AND ?
 			ORDER BY l.listened_at DESC LIMIT ? OFFSET ?`,
 			t1.Unix(), t2.Unix(), opts.Limit, offset,
@@ -135,7 +140,7 @@ func (s *Sqlite) GetListensPaginated(ctx context.Context, opts db.GetItemsOpts) 
 	var raw []listenRow
 	for rows.Next() {
 		var r listenRow
-		if err := rows.Scan(&r.listenedAt, &r.trackID, &r.title); err != nil {
+		if err := rows.Scan(&r.listenedAt, &r.trackID, &r.title, &r.username); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -157,6 +162,7 @@ func (s *Sqlite) GetListensPaginated(ctx context.Context, opts db.GetItemsOpts) 
 				ID:    r.trackID,
 				Title: r.title,
 			},
+			User: r.username,
 		}
 		l.Track.Artists, err = s.artistsForTrack(ctx, r.trackID)
 		if err != nil {

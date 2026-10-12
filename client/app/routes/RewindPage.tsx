@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useLocation, useNavigate } from "react-router";
 import { getRewindParams } from "~/utils/utils";
+import { getViewedUser } from "~/utils/viewedUser";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAppContext } from "~/providers/AppProvider";
 
@@ -48,7 +49,10 @@ export async function clientLoader({ request }: LoaderFunctionArgs) {
   if (!res.ok) throw new Response("Failed to load summary", { status: 500 });
 
   const stats: RewindStats = await res.json();
-  stats.title = `Your ${month && month > 0 ? months[month - 1] : ""} ${year} Rewind`;
+  const viewed = getViewedUser();
+  const whose =
+    viewed === "all" ? "Everyone's" : viewed ? `${viewed}'s` : "Your";
+  stats.title = `${whose} ${month && month > 0 ? months[month - 1] : ""} ${year} Rewind`;
   return { stats };
 }
 
